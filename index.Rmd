@@ -1,0 +1,153 @@
+---
+title: "Dynamic_Graphs_SchmidtJ"
+author: "Jeffrey Schmidt"
+date: "2022-09-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**Explanation**
+
+For this exercise I am interested in looking at the trends in compensation for the non-financial corporate sector in the US and how this relates to overall profits within this industry. 
+
+I have sourced my data for this from the US Bureau of Labor statistics, with indexed and YoY deltas dating back to the late 1940s. 
+
+The selection of this data was primarily exploratory and I have charted the variables a couple different ways. This includes the index from the start of data collection to present to understand the relative growth rates of each of our measurements (Profit, Hourly Compensation, Hours Worked and Productivity). With this we can select out the different variables, as well as zoom in on specific time periods with the scale finder.
+
+The second chart focuses on trends on Productivity, Compensation on the top chart vs. Profitability to allow for us to parse apart some of the potential relationships between the three variables over the past 70 years. The relationship between labor, compensation and profits is more complex than expected. Wage growth has been relatively low since the 1960s while productivity has been relatively flat. Interestingly, profits do show the highest growth YoY when wages are stagnating. 
+
+**Source & BLS Specific Measures**
+Key BLS measures are denoted below and can be found at their website: https://www.bls.gov/opub/hom/inp/concepts.htm
+Definitions for Labor Productivity and Hours Worked are sources from this page directly. 
+
+**Labor productivity** describes the relationship between the changes in the amount of output with the amount of labor used to produce that output. Labor productivity is expressed as an index, which is derived as a ratio of output growth to that of hours worked. Therefore, a change in labor productivity reflects the change in output that is not explained by the change in hours worked. Labor productivity can increase over time for many reasons, including technological advances, improved worker skills, improved management practices, economies of scale in production, and increases in the amount of nonlabor inputs used (capital, energy, materials, and purchased services).
+
+**Hours worked** is the total number of annual hours worked of all people in an industry. This includes paid employees, the self-employed (partners and proprietors), and unpaid family workers (those who work in a family business or farm without pay).
+
+**Profits** reported profits for specific sector for set time period (in this instance calendar year). 
+
+**Hourly Compensation** reported average hourly pay reported profits for specific sector for set time period (in this instance calendar year). 
+
+```{r}
+#load packages
+library(dygraphs)
+library(plotly)
+library(dplyr)
+library(tidyverse)
+```
+
+```{r}
+#set working director and pull in data
+setwd("C:/Users/jschm/OneDrive/Desktop/Subterm 1/STAA 566 - Data Visualization/dynamic-graphs-jeffschmidt2")
+labor <- read.csv("labor-productivity-major-sectors-csv.csv")
+```
+
+```{r}
+#convert our value of interest to numeric variable
+labor_test <- labor %>%
+  mutate(Value2 = as.numeric(Value))
+
+#manipulate data so it can be processed column-wise
+labor_test <- labor_test %>%  
+  group_by(Measure)%>%
+  mutate(row = row_number())
+
+labor_test <- labor_test %>%
+  tidyr::pivot_wider(names_from = Measure, values_from = Value2)
+
+#format labels
+names(labor_test) <- gsub(" ", "_",names(labor_test))
+
+#filter our relevant cases for non-fin sector, unit and time period of interest
+labor_test <- labor_test %>%
+  filter(Basis == "Employees") %>%
+  filter(Sector == "Nonfinancial corporate sector") %>%
+  filter(Qtr == "Annual") %>%
+  filter(Units == "Index (2012=100)")
+
+labor_test
+
+#comparing four measures of interest
+lab_plty2 <- plot_ly(labor_test, x = ~Year)%>%
+  add_lines(y = ~Labor_productivity, name = "Labor Productivity")%>%
+  add_lines(y = ~Hours_worked, name = "Hours Worked")%>%
+  add_lines(y = ~Hourly_compensation, name = "Hourly Compensation")%>%
+  add_lines(y = ~Profits, name = "Profits")
+
+#add range slider, labels and title
+lab_plty2 <- lab_plty2%>%
+  rangeslider()%>%
+  layout(hovermode = "x", 
+         title = list(text = "Profits, Hours & Compensation for Non-Fin Corporate Sector (Indexed vs. 2012)", font = 8),
+         yaxis = list(title = "Metric Index (2012=100)",
+         xaxis = list(title = "Year"), 
+         annotations = list(text = "Source: US Bureau of Labor Statistics", 
+         showarrow = FALSE, 
+         xref='paper', 
+         yref='paper')))
+
+#generate plot
+lab_plty2
+
+```
+
+
+```{r}
+#convert our value of interest to numeric variable
+labor_test2 <- labor %>%
+  mutate(Value2 = as.numeric(Value))
+
+#manipulate data so it can be processed column-wise
+labor_test2 <- labor_test2 %>%  
+  group_by(Measure)%>%
+  mutate(row = row_number())
+
+labor_test2 <- labor_test2 %>%
+  tidyr::pivot_wider(names_from = Measure, values_from = Value2)
+
+#format labels
+names(labor_test2) <- gsub(" ", "_",names(labor_test))
+
+labor_test2 <- labor_test2 %>%
+  filter(Basis == "Employees") %>%
+  filter(Sector == "Nonfinancial corporate sector") %>%
+  filter(Qtr == "Annual") %>%
+  filter(Units == "% Change from previous year")
+
+labor_test2
+
+#add range slider, labels and title as well as facets for Labor Figures vs. Profit
+lab_plty_hours <- plot_ly(labor_test2, x = ~Year)%>%
+  add_lines(y = ~Labor_productivity, name = "Labor Productivity")%>%
+  add_lines(y = ~Hourly_compensation, name = "Hourly Compensation")
+
+lab_plty_profit <- plot_ly(labor_test2, 
+                           x = ~Year,
+                           y = ~Profits, 
+                           name = "Profits", 
+                           type = "scatter",
+                           mode = "lines")
+
+lab_plty_facet <- subplot(list(lab_plty_hours,lab_plty_profit),
+                           nrows = 2,
+                           shareX = TRUE,
+                           titleX = FALSE)%>%
+  rangeslider()%>%
+  layout(hovermode = "X", 
+         title = "Profits, Productivity and Compensation, % Growth vs. Previous year",
+         xaxis = list(title = "Year"), 
+         yaxis = list(title = "% Growth vs. YAGO"), 
+         annotations = list(text = "Source: US Bureau of Labor Statistics", 
+         showarrow = FALSE, 
+         xref='paper', 
+         yref='paper'))
+
+#print chart
+lab_plty_facet
+
+```
+
+
